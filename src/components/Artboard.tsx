@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { gsap } from "gsap";
 import {
   MdZoomIn,
   MdZoomOut,
@@ -13,7 +14,7 @@ import {
 } from "react-icons/md";
 import { LuFlipHorizontal } from "react-icons/lu";
 import { RiDeleteBin5Line } from "react-icons/ri";
-
+import { FiLink } from "react-icons/fi";
 export default function Artboard({
   onHeaderInfoChange,
   showRulers = true,
@@ -23,6 +24,8 @@ export default function Artboard({
   marginSize = 0.25,
   autoNestStickers = false,
   spacing = 0.5,
+  onDataChange,
+  initialData,
 }: {
   onHeaderInfoChange?: (info: {
     hasItem: boolean;
@@ -39,6 +42,8 @@ export default function Artboard({
   marginSize?: number;
   autoNestStickers?: boolean;
   spacing?: number;
+  onDataChange?: (data: any) => void;
+  initialData?: any;
 }) {
   const [zoom, setZoom] = useState(1);
   const MIN_ZOOM = 1;
@@ -69,6 +74,7 @@ export default function Artboard({
   >([]);
   const [counter, setCounter] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showProperties, setShowProperties] = useState<Record<number, boolean>>({});
   const [originalPositions, setOriginalPositions] = useState<Record<number, { posX: number; posY: number }>>({});
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
@@ -76,6 +82,22 @@ export default function Artboard({
   const [isDraggingItem, setIsDraggingItem] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number; posX: number; posY: number } | null>(null);
   const animationRef = React.useRef<number | null>(null);
+  const [lowDpiCount, setLowDpiCount] = useState(0);
+
+  // Load initial data
+  useEffect(() => {
+    if (initialData) {
+      setItems(initialData.items || []);
+      setCounter(initialData.counter || 0);
+    }
+  }, [initialData]);
+
+  // Export data changes
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange({ items, counter });
+    }
+  }, [items, counter]);
   const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.05 : 0.95;
@@ -194,6 +216,7 @@ export default function Artboard({
     const dropY = (e.clientY - rect.top) / (96 * zoom);
     
     const start = counter + 1;
+    let lowDpiImages = 0;
     const created = await Promise.all(
       dropped.map(async (file, idx) => {
         const [{ dpiX, dpiY }, { widthPx, heightPx, url }] = await Promise.all([
@@ -201,8 +224,10 @@ export default function Artboard({
           loadImageSize(file),
         ]);
         const dpi = Math.max(1, Math.round(dpiX || dpiY || 150));
+        if (dpi < 300) lowDpiImages++;
         const widthIn = widthPx / dpi;
         const heightIn = heightPx / dpi;
+        console.log('Image dimensions:', { widthPx, heightPx, dpi, widthIn, heightIn, fileName: file.name });
         return {
           id: start + idx,
           url,
@@ -210,7 +235,7 @@ export default function Artboard({
           locked: false,
           expanded: false,
           flipped: false,
-          autoCrop: true,
+          autoCrop: false,
           copies: 1,
           widthIn,
           heightIn,
@@ -226,13 +251,17 @@ export default function Artboard({
         } as (typeof items)[number] & { dropY: number; velocityY: number; gravityActive: boolean };
       })
     );
+    if (lowDpiImages > 0) {
+      setLowDpiCount(lowDpiImages);
+      setTimeout(() => setLowDpiCount(0), 8000);
+    }
     setItems((prev) => {
       const existingWithGravity = prev.map(it => ({ ...it, gravityActive: true, velocityY: -0.15 }));
       return [...existingWithGravity, ...created];
     });
     const newSelected = start + dropped.length - 1;
     setCounter(newSelected);
-    setSelectedId(newSelected);
+    setSelectedId(null);
   };
   const zoomIn = () =>
     setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.1).toFixed(2)));
@@ -306,11 +335,58 @@ export default function Artboard({
   };
   const toggleAutoCrop = () => {
     if (selectedId == null) return;
-    setItems((prev) =>
-      prev.map((it) =>
-        it.id === selectedId ? { ...it, autoCrop: !it.autoCrop } : it
-      )
-    );
+    const item = items.find(it => it.id === selectedId);
+    if (!item) return;
+    
+    if (!item.autoCrop) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+        
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const alpha = data[(y * canvas.width + x) * 4 + 3];
+            if (alpha > 10) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        
+        const cropWidth = maxX - minX + 1;
+        const cropHeight = maxY - minY + 1;
+        const dpi = Math.max(1, Math.round(150));
+        const newWidthIn = cropWidth / dpi;
+        const newHeightIn = cropHeight / dpi;
+        
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === selectedId ? { ...it, autoCrop: true, widthIn: newWidthIn, heightIn: newHeightIn } : it
+          )
+        );
+      };
+      img.src = item.url;
+    } else {
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === selectedId ? { ...it, autoCrop: false } : it
+        )
+      );
+    }
   };
   const toggleLinked = () => {
     if (selectedId == null) return;
@@ -495,14 +571,18 @@ export default function Artboard({
       } else {
         const target = items.find(it => it.id === selectedId);
         if (target) {
-          const areaSf = +((target.widthIn * target.heightIn) / 144).toFixed(2);
+          const widthIn = +target.widthIn.toFixed(2);
+          const heightIn = +target.heightIn.toFixed(2);
+          const areaSf = +((widthIn * heightIn) / 144).toFixed(2);
+          const pricePerSqFt = 5.50;
+          const price = +(areaSf * pricePerSqFt).toFixed(2);
           onHeaderInfoChange({
             hasItem: true,
             areaSf,
-            widthIn: target.widthIn,
-            heightIn: target.heightIn,
+            widthIn,
+            heightIn,
             name: target.name || `Item #${target.id}`,
-            price: 12.34,
+            price,
           });
         }
       }
@@ -530,143 +610,27 @@ export default function Artboard({
   }, []);
 
   useEffect(() => {
-    const hasGravity = items.some(it => it.gravityActive);
-    if (!hasGravity || canvasWidth === 0) {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
+    items.forEach((it) => {
+      const element = document.querySelector(`[data-item-id="${it.id}"]`) as HTMLElement;
+      if (!element) return;
+      
+      if (it.gravityActive) {
+        gsap.to(element, {
+          left: `${it.posX * 96}px`,
+          top: `${it.posY * 96}px`,
+          duration: 2,
+          ease: "bounce.out",
+        });
+      } else {
+        gsap.to(element, {
+          left: `${it.posX * 96}px`,
+          top: `${it.posY * 96}px`,
+          duration: 0.3,
+          ease: "power2.out",
+        });
       }
-      return;
-    }
-
-    const gravity = 0.012;
-    const bounce = 0.7;
-    const friction = 0.99;
-
-    const animate = () => {
-      setItems(prev => {
-        const margin = 1.0;
-        const maxWidth = canvasWidth - (margin * 2);
-        
-        const rows: typeof prev[] = [];
-        let currentRow: typeof prev = [];
-        let currentRowWidth = 0;
-        
-        prev.forEach(it => {
-          const itemWidth = it.widthIn + spacing;
-          if (currentRowWidth + itemWidth > maxWidth && currentRow.length > 0) {
-            rows.push(currentRow);
-            currentRow = [it];
-            currentRowWidth = itemWidth;
-          } else {
-            currentRow.push(it);
-            currentRowWidth += itemWidth;
-          }
-        });
-        if (currentRow.length > 0) rows.push(currentRow);
-        
-        let currentY = margin;
-        const targetPositions = new Map<number, { x: number; y: number }>();
-        rows.forEach(row => {
-          const rowWidth = row.reduce((sum, it, idx) => sum + it.widthIn + (idx > 0 ? spacing : 0), 0);
-          let currentX = autoNestStickers ? margin : (canvasWidth - rowWidth) / 2;
-          const maxHeight = Math.max(...row.map(it => it.heightIn));
-          
-          row.forEach(it => {
-            targetPositions.set(it.id, { x: currentX, y: currentY });
-            currentX += it.widthIn + spacing;
-          });
-          
-          currentY += maxHeight + spacing;
-        });
-        
-        let stillAnimating = false;
-        const updated = prev.map(it => {
-          if (!it.gravityActive) return it;
-          
-          const target = targetPositions.get(it.id);
-          if (!target) return it;
-          
-          let newVelocityY = (it.velocityY || 0) + gravity;
-          let newPosY = it.posY + newVelocityY;
-          
-          if (newPosY >= target.y) {
-            newPosY = target.y;
-            if (Math.abs(newVelocityY) > 0.008) {
-              newVelocityY = -newVelocityY * bounce;
-              stillAnimating = true;
-            } else {
-              return { ...it, posX: target.x, posY: target.y, velocityY: 0, gravityActive: false, isAnimating: false, dropY: undefined };
-            }
-          } else {
-            stillAnimating = true;
-          }
-          
-          newVelocityY *= friction;
-          
-          return { ...it, posY: newPosY, posX: target.x, velocityY: newVelocityY };
-        });
-        
-        if (stillAnimating) {
-          animationRef.current = requestAnimationFrame(animate);
-        }
-        
-        return updated;
-      });
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-    };
-  }, [items.filter(it => it.gravityActive).length, canvasWidth, autoNestStickers, spacing]);
-
-  useEffect(() => {
-    if (items.length > 0 && canvasWidth > 0 && !items.some(it => it.gravityActive)) {
-      const margin = 1.0;
-      const maxWidth = canvasWidth - (margin * 2);
-      
-      const rows: typeof items[] = [];
-      let currentRow: typeof items = [];
-      let currentRowWidth = 0;
-      
-      items.forEach(it => {
-        const itemWidth = it.widthIn + spacing;
-        if (currentRowWidth + itemWidth > maxWidth && currentRow.length > 0) {
-          rows.push(currentRow);
-          currentRow = [it];
-          currentRowWidth = itemWidth;
-        } else {
-          currentRow.push(it);
-          currentRowWidth += itemWidth;
-        }
-      });
-      if (currentRow.length > 0) rows.push(currentRow);
-      
-      let currentY = margin;
-      const positioned = rows.flatMap(row => {
-        const rowWidth = row.reduce((sum, it, idx) => sum + it.widthIn + (idx > 0 ? spacing : 0), 0);
-        let currentX = autoNestStickers ? margin : (canvasWidth - rowWidth) / 2;
-        const maxHeight = Math.max(...row.map(it => it.heightIn));
-        
-        const rowItems = row.map(it => {
-          const finalX = snapToGrid ? snapToGridPoint(currentX) : currentX;
-          const finalY = snapToGrid ? snapToGridPoint(currentY) : currentY;
-          currentX += it.widthIn + spacing;
-          return { ...it, posX: finalX, posY: finalY };
-        });
-        
-        currentY += maxHeight + spacing;
-        return rowItems;
-      });
-      
-      setItems(positioned);
-    }
-  }, [spacing, autoNestStickers, canvasWidth, snapToGrid]);
+    });
+  }, [items]);
 
   // Ruler Segment Component
   const RulerSegment = ({ vertical = false, label }: { vertical?: boolean; label: number }) => {
@@ -679,7 +643,7 @@ export default function Artboard({
     return (
       <div className={`relative ${vertical ? 'h-24 w-full border-t border-gray-300' : 'w-24 h-full border-l border-gray-300'} flex-shrink-0`}>
         {label !== 0 && (
-          <span className={`absolute text-[9px] text-gray-500 font-medium select-none ${vertical ? 'top-1 left-1' : 'top-1 left-1'}`}>
+          <span className={`absolute text-[9px] text-gray-500 font-medium select-none ${vertical ? 'top-1 left-4' : 'top-4 left-1'}`}>
             {label}
           </span>
         )}
@@ -689,8 +653,8 @@ export default function Artboard({
           else if (pos === 24 || pos === 72) height = 'h-3'; // 1/4
 
           const style = vertical
-            ? { top: `${pos}px`, right: 0, width: height === 'h-4' ? '12px' : height === 'h-3' ? '8px' : '5px', height: '1px' }
-            : { left: `${pos}px`, bottom: 0, height: height === 'h-4' ? '12px' : height === 'h-3' ? '8px' : '5px', width: '1px' };
+            ? { top: `${pos}px`, left: 0, width: height === 'h-4' ? '12px' : height === 'h-3' ? '8px' : '5px', height: '1px' }
+            : { left: `${pos}px`, top: 0, height: height === 'h-4' ? '12px' : height === 'h-3' ? '8px' : '5px', width: '1px' };
 
           return (
             <div
@@ -706,6 +670,13 @@ export default function Artboard({
 
   return (
     <div className="flex-1 relative bg-gray-50 overflow-hidden flex flex-col">
+      {lowDpiCount > 0 && (
+        <div className="absolute w-[720px] text-center top-10 left-1/2 -translate-x-1/2 z-50 bg-[#FFFBEB] border border-[#EFB106] rounded-lg px-4 py-2 shadow-lg">
+          <p style={{ fontFamily: 'Roboto', fontWeight: 400, fontSize: '14px', lineHeight: '20px', letterSpacing: '0px', color: '#EFB106' }}>
+            {lowDpiCount} image{lowDpiCount > 1 ? 's have' : ' has'} resolution below 300 DPI. For optimal DTF printing quality, images should be at least 300 DPI at print size.
+          </p>
+        </div>
+      )}
       <div className="flex-1 flex relative">
         {/* Main Canvas Area */}
         <div
@@ -755,45 +726,45 @@ export default function Artboard({
               </div>
             </div>
           )}
-          
+
           {/* Corner 0 Label */}
           {showRulers && (
             <div className="absolute top-0 left-0 w-8 h-8 z-20 bg-white border-b border-r border-gray-200 flex items-center justify-center pointer-events-none">
               <span className="text-[9px] text-gray-500 font-medium">0</span>
             </div>
           )}
-          
+
           {/* Margins */}
           {showMargins && (
             <>
-              <div 
+              <div
                 className="absolute z-15 pointer-events-none border-2 border-dashed border-red-500 rounded-lg"
                 style={{
-                  top: showRulers ? '12px' : '0',
-                  left: showRulers ? '12px' : '0',
-                  right: '0',
-                  bottom: '0',
+                  top: showRulers ? "12px" : "0",
+                  left: showRulers ? "12px" : "0",
+                  right: "0",
+                  bottom: "0",
                   margin: `${marginSize * 96}px`,
                   transform: `scale(${zoom})`,
-                  transformOrigin: "top left"
+                  transformOrigin: "top left",
                 }}
               />
-              <div 
+              <div
                 className="absolute z-15 pointer-events-none text-red-500 text-xs font-medium"
                 style={{
-                  top: showRulers ? '16px' : '4px',
-                  left: showRulers ? '16px' : '4px',
+                  top: showRulers ? "16px" : "4px",
+                  left: showRulers ? "16px" : "4px",
                   transform: `scale(${zoom})`,
                   transformOrigin: "top left",
                   marginTop: `${marginSize * 96 + 2}px`,
-                  marginLeft: `${marginSize * 96 + 2}px`
+                  marginLeft: `${marginSize * 96 + 2}px`,
                 }}
               >
                 Safe Print Area ({marginSize}" margin)
               </div>
             </>
           )}
-          
+
           <div
             className="absolute inset-0"
             style={{
@@ -801,7 +772,10 @@ export default function Artboard({
               transformOrigin: "center",
               transition: "transform 200ms ease-out",
             }}
-            onClick={() => setSelectedId(null)}
+            onClick={() => {
+              setSelectedId(null);
+              setShowProperties({});
+            }}
           >
             <div className="absolute inset-0 z-10">
               {items.length > 0 ? (
@@ -809,22 +783,32 @@ export default function Artboard({
                   {items.map((it) => (
                     <div
                       key={it.id}
-                      className={`absolute rounded-md ${selectedId === it.id ? "ring-4 ring-blue-500" : ""}`}
+                      data-item-id={it.id}
+                      className={`absolute rounded-md ${
+                        selectedId === it.id ? "ring-4 ring-blue-500" : ""
+                      }`}
                       style={{
                         left: `${it.posX * 96}px`,
                         top: `${it.posY * 96}px`,
-                        transition: it.isAnimating ? 'left 3s ease-in-out, top 3s ease-in-out' : (it.gravityActive ? 'none' : 'left 0.3s ease-out, top 0.3s ease-out'),
-                        touchAction: 'none'
+                        touchAction: "none",
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedId(it.id);
+                        if (selectedId === it.id && !showProperties[it.id]) {
+                          setShowProperties((prev) => ({
+                            ...prev,
+                            [it.id]: true,
+                          }));
+                        } else if (selectedId !== it.id) {
+                          setSelectedId(it.id);
+                          setShowProperties({});
+                        }
                       }}
                     >
                       {selectedId === it.id && (
                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/95 border border-gray-200 shadow-xl rounded-lg px-2 py-1">
                           <button
-                            className="p-0.5 text-gray-700 hover:text-black"
+                            className="p-0.5 text-gray-400 hover:text-black"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleExpandSelected();
@@ -834,7 +818,7 @@ export default function Artboard({
                           </button>
                           <span className="w-px h-3 bg-gray-200" />
                           <button
-                            className="p-0.5 text-gray-700 hover:text-black"
+                            className="p-0.5 text-gray-400 hover:text-black"
                             onClick={(e) => {
                               e.stopPropagation();
                               rotateSelected();
@@ -844,7 +828,7 @@ export default function Artboard({
                           </button>
                           <span className="w-px h-3 bg-gray-200" />
                           <button
-                            className="p-0.5 text-gray-700 hover:text-black"
+                            className="p-0.5 text-gray-400 hover:text-black"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleLockSelected();
@@ -857,7 +841,7 @@ export default function Artboard({
                             )}
                           </button>
                           <button
-                            className="p-0.5 text-gray-700 hover:text-black"
+                            className="p-0.5 text-gray-400 hover:text-black"
                             onClick={(e) => {
                               e.stopPropagation();
                               flipSelected();
@@ -867,7 +851,7 @@ export default function Artboard({
                           </button>
                           <span className="w-px h-3 bg-gray-200" />
                           <button
-                            className="p-0.5 text-gray-700 hover:text-black"
+                            className="p-0.5 text-gray-400 hover:text-black"
                             onClick={(e) => {
                               e.stopPropagation();
                               duplicateSelected();
@@ -877,7 +861,7 @@ export default function Artboard({
                           </button>
                           <span className="w-px h-3 bg-gray-200" />
                           <button
-                            className="p-0.5 text-red-600 hover:text-red-700"
+                            className="p-0.5 text-red-400 hover:text-red-700"
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteSelected();
@@ -887,7 +871,7 @@ export default function Artboard({
                           </button>
                         </div>
                       )}
-                      {selectedId === it.id && (
+                      {selectedId === it.id && showProperties[it.id] && (
                         <div
                           className="absolute top-0 left-full ml-3 z-30 w-60 bg-white border border-gray-300 shadow-2xl rounded-xl"
                           onClick={(e) => e.stopPropagation()}
@@ -900,7 +884,9 @@ export default function Artboard({
                             </div>
                             <button
                               className="p-1 text-gray-600 hover:text-black"
-                              onClick={() => setSelectedId(null)}
+                              onClick={() => {
+                                setShowProperties({});
+                              }}
                             >
                               <MdClose className="w-4 h-4" />
                             </button>
@@ -926,15 +912,17 @@ export default function Artboard({
                               </div>
                             </div>
                             <button
-                              className={`w-9 h-5 rounded-full flex items-center ${it.autoCrop ? "bg-blue-600" : "bg-gray-300"
-                                }`}
+                              className={`w-9 h-5 rounded-full flex items-center transition-colors ${
+                                it.autoCrop ? "bg-blue-600" : "bg-gray-300"
+                              }`}
                               onClick={toggleAutoCrop}
                             >
                               <span
-                                className={`w-4 h-4 bg-white rounded-full shadow transform transition ${it.autoCrop
-                                  ? "translate-x-4"
-                                  : "translate-x-1"
-                                  }`}
+                                className={`w-4 h-4 bg-white rounded-full shadow transform transition ${
+                                  it.autoCrop
+                                    ? "translate-x-4"
+                                    : "translate-x-1"
+                                }`}
                               ></span>
                             </button>
                           </div>
@@ -951,7 +939,7 @@ export default function Artboard({
                                   Math.max(1, parseInt(e.target.value || "1"))
                                 )
                               }
-                              className="w-full h-8 px-3 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
+                              className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
                             />
                           </div>
                           <div className="px-3 py-2 border-t border-gray-300">
@@ -960,8 +948,9 @@ export default function Artboard({
                                 Dimensions
                               </div>
                               <button
-                                className={`p-1 rounded ${it.linked ? "text-blue-600" : "text-gray-600"
-                                  }`}
+                                className={`p-1 rounded ${
+                                  it.linked ? "text-blue-600" : "text-gray-600"
+                                }`}
                                 onClick={toggleLinked}
                                 title={it.linked ? "Linked" : "Unlinked"}
                               >
@@ -982,7 +971,7 @@ export default function Artboard({
                                       parseFloat(e.target.value || "0")
                                     )
                                   }
-                                  className="w-full h-8 px-3 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
+                                  className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
                                 />
                               </div>
                               <div>
@@ -998,7 +987,7 @@ export default function Artboard({
                                       parseFloat(e.target.value || "0")
                                     )
                                   }
-                                  className="w-full h-8 px-3 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
+                                  className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
                                 />
                               </div>
                             </div>
@@ -1019,7 +1008,7 @@ export default function Artboard({
                                   onChange={(e) =>
                                     setPosX(parseFloat(e.target.value || "0"))
                                   }
-                                  className="w-full h-8 px-3 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
+                                  className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
                                 />
                               </div>
                               <div>
@@ -1033,55 +1022,62 @@ export default function Artboard({
                                   onChange={(e) =>
                                     setPosY(parseFloat(e.target.value || "0"))
                                   }
-                                  className="w-full h-8 px-3 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
+                                  className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
                                 />
                               </div>
                             </div>
                           </div>
-                          <div className="h-2" />
+                          <div className="px-3 py-3 border-t border-gray-300">
+                            <button className="w-full bg-blue-600 text-white py-1.5 rounded-lg text-xs hover:bg-blue-700">
+                              Add to Cart
+                            </button>
+                          </div>
                         </div>
                       )}
                       {selectedId === it.id && (
-                        <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs rounded px-2 h-6 flex items-center gap-1">
-                          <MdLink className="w-3.5 h-3.5" />
+                        <div className="absolute top-1 left-2 bg-blue-600 text-white text-xs rounded-xl px-2 h-5 flex items-center gap-1">
+                          <FiLink className="w-3 h-3" />
                           <span>#{it.id}</span>
                         </div>
                       )}
                       <img
                         src={it.url}
                         alt="dropped"
-                        className={`${it.expanded
-                          ? "max-w-[60vw] max-h-[60vh]"
-                          : "max-w-[40vw] max-h-[40vh]"
-                          } object-contain ${!it.locked ? 'cursor-move' : 'cursor-default'}`}
+                        className={`${
+                          it.expanded
+                            ? "max-w-[60vw] max-h-[60vh]"
+                            : "max-w-[40vw] max-h-[40vh]"
+                        } object-contain ${
+                          !it.locked ? "cursor-move" : "cursor-default"
+                        }`}
                         style={{
                           width: `${it.widthIn * 96}px`,
                           height: `${it.heightIn * 96}px`,
-                          transform: `scaleX(${it.flipped ? -1 : 1}) rotate(${it.rotation
-                            }deg)`,
+                          transform: `scaleX(${it.flipped ? -1 : 1}) rotate(${
+                            it.rotation
+                          }deg)`,
                         }}
                         onMouseDown={(e) => {
                           e.stopPropagation();
-                          setSelectedId(it.id);
                           handleDragStart(e, it.id);
                         }}
                       />
                       {selectedId === it.id && (
                         <>
-                          <span 
-                            className="absolute -top-2 -left-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-blue-500 cursor-nwse-resize"
+                          <span
+                            className="absolute -top-2 -left-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-nwse-resize"
                             onMouseDown={(e) => handleResizeStart(e, it.id)}
                           ></span>
-                          <span 
-                            className="absolute -top-2 -right-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-blue-500 cursor-nesw-resize"
+                          <span
+                            className="absolute -top-2 -right-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-nesw-resize"
                             onMouseDown={(e) => handleResizeStart(e, it.id)}
                           ></span>
-                          <span 
-                            className="absolute -bottom-2 -left-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-blue-500 cursor-nesw-resize"
+                          <span
+                            className="absolute -bottom-2 -left-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-nesw-resize"
                             onMouseDown={(e) => handleResizeStart(e, it.id)}
                           ></span>
-                          <span 
-                            className="absolute -bottom-2 -right-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-blue-500 cursor-nwse-resize"
+                          <span
+                            className="absolute -bottom-2 -right-2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-nwse-resize"
                             onMouseDown={(e) => handleResizeStart(e, it.id)}
                           ></span>
                         </>

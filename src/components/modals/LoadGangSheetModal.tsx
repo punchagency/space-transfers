@@ -17,9 +17,10 @@ interface LoadGangSheetModalProps {
   onRename?: (id: number, newTitle: string) => void;
   onDuplicate?: (id: number) => void;
   onDelete?: (id: number) => void;
+  onLoad?: (id: number) => void;
 }
 
-const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose, designs, onRename, onDuplicate, onDelete }) => {
+const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose, designs, onRename, onDuplicate, onDelete, onLoad }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
@@ -47,7 +48,7 @@ const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-xs">
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl mx-4">
         {/* Header */}
         <div className="flex items-center gap-4   px-6 py-5">
@@ -91,6 +92,12 @@ const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose
               <div
                 key={design.id}
                 className="w-[260px] flex-shrink-0 overflow-hidden rounded-2xl border-2 border-[#E2E8F0] hover:border-[#155DFC] bg-white shadow-sm cursor-pointer hover:shadow-md transition-all group relative"
+                onClick={() => {
+                  if (onLoad) {
+                    onLoad(design.id);
+                    onClose();
+                  }
+                }}
               >
                 <div className="relative h-[200px] bg-[#F1F5F9] overflow-hidden px-1 py-4">
                   <img

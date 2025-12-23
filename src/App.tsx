@@ -5,6 +5,9 @@ import Sidebar from "./components/Sidebar";
 import SaveGangSheetModal from "./components/modals/SaveGangSheetModal";
 import LoadGangSheetModal from "./components/modals/LoadGangSheetModal";
 import AccountSettingsModal from "./components/modals/AccountSettingsModal";
+import OrderHistoryModal from "./components/modals/OrderHistoryModal";
+import OrderDetailsModal from "./components/modals/OrderDetailsModal";
+import CheckoutModal from "./components/modals/CheckoutModal";
 
 export default function App() {
   const [showHome, setShowHome] = useState(false);
@@ -13,6 +16,9 @@ export default function App() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [headerInfo, setHeaderInfo] = useState<{
     hasItem: boolean;
     areaSf?: number;
@@ -27,7 +33,10 @@ export default function App() {
     time: string;
     size: string;
     thumbnail: string;
+    data?: any;
   }>>([]);
+  const [artboardData, setArtboardData] = useState<any>(null);
+  const [loadedDesignData, setLoadedDesignData] = useState<any>(null);
 
   // Settings State lifted from Sidebar
   const [settings, setSettings] = useState({
@@ -64,8 +73,19 @@ export default function App() {
   if (showHome) {
     return (
       <div className="flex flex-col h-screen w-screen bg-white">
-        <Header info={headerInfo} onMenuClick={() => setIsSidebarOpen(true)} />
-        <Artboard onHeaderInfoChange={setHeaderInfo} showRulers={settings.showRulers} showGrid={settings.showGrid} snapToGrid={settings.snapToGrid} showMargins={settings.showMargins} marginSize={settings.marginSize} autoNestStickers={settings.autoNestStickers} spacing={settings.spacing} />
+        <Header info={headerInfo} onMenuClick={() => setIsSidebarOpen(true)} onCartClick={() => setShowCheckoutModal(true)} />
+        <Artboard 
+          onHeaderInfoChange={setHeaderInfo} 
+          showRulers={settings.showRulers} 
+          showGrid={settings.showGrid} 
+          snapToGrid={settings.snapToGrid} 
+          showMargins={settings.showMargins} 
+          marginSize={settings.marginSize} 
+          autoNestStickers={settings.autoNestStickers} 
+          spacing={settings.spacing}
+          onDataChange={setArtboardData}
+          initialData={loadedDesignData}
+        />
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -78,13 +98,15 @@ export default function App() {
         <SaveGangSheetModal 
           isOpen={showSaveModal} 
           onClose={() => setShowSaveModal(false)}
-          onSave={(title: string, thumbnail: string) => {
+          artboardData={artboardData}
+          onSave={(title: string, thumbnail: string, data: any) => {
             const newDesign = {
               id: Date.now(),
               title,
               time: 'Just now',
               size: '24" × 19.5"',
-              thumbnail
+              thumbnail,
+              data
             };
             setSavedDesigns(prev => [newDesign, ...prev]);
             setShowSaveModal(false);
@@ -94,6 +116,13 @@ export default function App() {
           isOpen={showLoadModal} 
           onClose={() => setShowLoadModal(false)}
           designs={savedDesigns}
+          onLoad={(id) => {
+            const design = savedDesigns.find(d => d.id === id);
+            if (design && design.data) {
+              setLoadedDesignData(design.data);
+              setShowLoadModal(false);
+            }
+          }}
           onRename={(id, newTitle) => {
             setSavedDesigns(prev => prev.map(d => d.id === id ? { ...d, title: newTitle } : d));
           }}
@@ -108,7 +137,34 @@ export default function App() {
             setSavedDesigns(prev => prev.filter(d => d.id !== id));
           }}
         />
-        <AccountSettingsModal isOpen={showAccountModal} onClose={() => setShowAccountModal(false)} />
+        <AccountSettingsModal 
+          isOpen={showAccountModal} 
+          onClose={() => setShowAccountModal(false)}
+          onOpenOrderHistory={() => {
+            setShowAccountModal(false);
+            setShowOrderHistoryModal(true);
+          }}
+          onViewOrderDetails={() => {
+            setShowAccountModal(false);
+            setShowOrderDetailsModal(true);
+          }}
+        />
+        <OrderHistoryModal
+          isOpen={showOrderHistoryModal}
+          onClose={() => setShowOrderHistoryModal(false)}
+          onViewDetails={() => {
+            setShowOrderHistoryModal(false);
+            setShowOrderDetailsModal(true);
+          }}
+        />
+        <OrderDetailsModal 
+          isOpen={showOrderDetailsModal} 
+          onClose={() => setShowOrderDetailsModal(false)}
+        />
+        <CheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={() => setShowCheckoutModal(false)}
+        />
       </div>
     );
   }

@@ -6,13 +6,15 @@ import { LiaSave } from "react-icons/lia";
 interface SaveGangSheetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, thumbnail: string) => void;
+  onSave: (title: string, thumbnail: string, data: any) => void;
+  artboardData?: any;
 }
 
 const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  artboardData,
 }) => {
   const [designName, setDesignName] = useState("Untitled Design");
 
@@ -54,7 +56,7 @@ const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
         }
         
         const thumbnail = canvas.toDataURL('image/png');
-        onSave(designName, thumbnail);
+        onSave(designName, thumbnail, artboardData);
         setDesignName("Untitled Design");
       }
     }
@@ -83,7 +85,7 @@ const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
 
 
   return (
-    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm z-50">
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center bg-black/20 backdrop-blur-xs z-50">
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-[18px] shadow-lg w-full max-w-md mx-4">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
