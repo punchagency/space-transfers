@@ -9,21 +9,19 @@ import { LuShoppingCart } from "react-icons/lu";
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  cartItems?: any[];
 }
 
 const steps = ["Cart", "Checkout", "Payment", "Confirmation"];
 
-export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, cartItems: initialCartItems }: CheckoutModalProps) {
   const [step, setStep] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const stepperRefs = useRef<(HTMLDivElement | null)[]>([]);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [payment, setPayment] = useState<"card" | "paypal">("card");
   const [shipping, setShipping] = useState<"standard" | "express">("standard");
-  const [cartItems, setCartItems] = useState([
-    { id: 1, name: 'Astronaut Sticker', size: 'Large', color: 'Navy Blue', design: 'Custom Logo Design', print: 'DTF Transfer', price: 29.99, quantity: 2 },
-    { id: 2, name: 'Astronaut Sticker', size: 'Large', color: 'Navy Blue', design: 'Custom Logo Design', print: 'DTF Transfer', price: 29.99, quantity: 2 }
-  ]);
+  const [cartItems, setCartItems] = useState(initialCartItems || []);
   const [formData, setFormData] = useState({
     firstName: 'John',
     lastName: 'Doe',
@@ -42,15 +40,26 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     cardName: 'John Doe'
   });
 
-  const subtotal = 59.98;
+  const subtotal = cartItems.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || item.copies || 1)), 0);
   const shippingCost = shipping === 'standard' ? 8.99 : 24.99;
-  const tax = 4.80;
+  const tax = subtotal * 0.08;
   const total = subtotal + shippingCost + tax;
 
+  useEffect(() => {
+    if (initialCartItems) {
+      setCartItems(initialCartItems);
+    }
+  }, [initialCartItems]);
+
   const updateQuantity = (id: number, change: number) => {
-    setCartItems(items => items.map(item => 
-      item.id === id ? { ...item, quantity: Math.max(1, item.quantity + change) } : item
-    ));
+    setCartItems(items => items.map(item => {
+      if (item.id === id) {
+        const currentQty = item.quantity || item.copies || 1;
+        const newQty = Math.max(1, currentQty + change);
+        return { ...item, quantity: newQty, copies: newQty };
+      }
+      return item;
+    }));
   };
 
   const removeItem = (id: number) => {
@@ -147,13 +156,14 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </span>
               </div>
               {i < steps.length - 1 && (
-                <div
-                  ref={(el) => (lineRefs.current[i] = el)}
-                  className={`h-0.5 w-16 mb-6 origin-left ${
-                    i < step ? "bg-blue-600" : "bg-gray-200"
-                  }`}
-                  style={{ transform: i < step ? "scaleX(1)" : "scaleX(0)" }}
-                />
+                <div className="relative h-0.5 w-16 mb-6">
+                  <div className="absolute inset-0 bg-gray-200" />
+                  <div
+                    ref={(el) => (lineRefs.current[i] = el)}
+                    className="absolute inset-0 bg-blue-600 origin-left"
+                    style={{ transform: i < step ? "scaleX(1)" : "scaleX(0)" }}
+                  />
+                </div>
               )}
             </React.Fragment>
           ))}

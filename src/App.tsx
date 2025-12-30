@@ -8,6 +8,7 @@ import AccountSettingsModal from "./components/modals/AccountSettingsModal";
 import OrderHistoryModal from "./components/modals/OrderHistoryModal";
 import OrderDetailsModal from "./components/modals/OrderDetailsModal";
 import CheckoutModal from "./components/modals/CheckoutModal";
+import { captureArtboard } from "./components/artboard/lib/utils";
 
 export default function App() {
   const [showHome, setShowHome] = useState(false);
@@ -19,6 +20,7 @@ export default function App() {
   const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [cartItems, setCartItems] = useState<any[]>([]);
   const [headerInfo, setHeaderInfo] = useState<{
     hasItem: boolean;
     areaSf?: number;
@@ -53,6 +55,37 @@ export default function App() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleAddGangSheetToCart = async () => {
+    try {
+      // Add gang sheet without image first
+      const gangSheetItem = {
+        id: Date.now(),
+        name: 'Gang Sheet',
+        type: 'gangsheet',
+        image: '/placeholder-gangsheet.png',
+        items: artboardData?.items || [],
+        price: artboardData?.items?.reduce((sum: number, item: any) => sum + (item.price * item.copies), 0) || 0,
+        widthIn: 24,
+        heightIn: 19.5,
+        copies: 1,
+      };
+      setCartItems(prev => [...prev, gangSheetItem]);
+      
+      // Try to capture image in background
+      try {
+        const imageDataUrl = await captureArtboard();
+        setCartItems(prev => prev.map(item => 
+          item.id === gangSheetItem.id ? { ...item, image: imageDataUrl } : item
+        ));
+      } catch (captureError) {
+        console.warn('Image capture failed, using placeholder:', captureError);
+      }
+    } catch (error) {
+      console.error('Failed to add gang sheet:', error);
+      alert('Failed to add gang sheet to cart');
+    }
+  };
+
   useEffect(() => {
     if (showHome) return;
 
@@ -73,7 +106,13 @@ export default function App() {
   if (showHome) {
     return (
       <div className="flex flex-col h-screen w-screen bg-white">
-        <Header info={headerInfo} onMenuClick={() => setIsSidebarOpen(true)} onCartClick={() => setShowCheckoutModal(true)} />
+        <Header 
+          info={headerInfo} 
+          onMenuClick={() => setIsSidebarOpen(true)} 
+          onCartClick={() => setShowCheckoutModal(true)} 
+          cartCount={cartItems.length}
+          onAddGangSheetToCart={handleAddGangSheetToCart}
+        />
         <Artboard 
           onHeaderInfoChange={setHeaderInfo} 
           showRulers={settings.showRulers} 
@@ -85,6 +124,7 @@ export default function App() {
           spacing={settings.spacing}
           onDataChange={setArtboardData}
           initialData={loadedDesignData}
+          onAddToCart={(item) => setCartItems(prev => [...prev, item])}
         />
         <Sidebar
           isOpen={isSidebarOpen}
@@ -164,6 +204,7 @@ export default function App() {
         <CheckoutModal
           isOpen={showCheckoutModal}
           onClose={() => setShowCheckoutModal(false)}
+          cartItems={cartItems}
         />
       </div>
     );
