@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { ArtboardItem } from "../../types";
-import { animateItemPosition } from "../../lib/utils";
-import { calculateGridLayout } from "../../lib/utils";
-import { snapToGridPoint } from "../../lib/utils";
+import { animateItemPosition } from "../utils";
+import { calculateGridLayout } from "../utils";
+import { snapToGridPoint } from "../utils";
 
 export const useArtboardEffects = (
   items: ArtboardItem[],
@@ -12,6 +12,8 @@ export const useArtboardEffects = (
   canvasWidth: number,
   spacing: number,
   autoNestStickers: boolean,
+  marginSize: number,
+  isDraggingItem: boolean,
   onHeaderInfoChange?: (info: any) => void,
   initialData?: any,
   onDataChange?: (data: any) => void,
@@ -20,6 +22,8 @@ export const useArtboardEffects = (
   const [originalPositions, setOriginalPositions] = useState<
     Record<number, { posX: number; posY: number }>
   >({});
+  const [lastConfig, setLastConfig] = useState({ marginSize, spacing });
+  const prevItemsRef = useRef<ArtboardItem[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -35,60 +39,71 @@ export const useArtboardEffects = (
     }
   }, [items, counter, onDataChange]);
 
-  // Update canvas width
-  useEffect(() => {
-    const updateCanvasWidth = () => {
-      const canvas = document.querySelector(
-        ".flex-1.relative.flex.items-center"
-      ) as HTMLElement;
-      if (canvas) {
-        return canvas.offsetWidth / 96;
-      }
-      return 0;
-    };
-    updateCanvasWidth();
-  }, []);
 
-  // Animate items
+  // Animate items only when gravity is active
   useEffect(() => {
     items.forEach((it) => {
+      if (!it.gravityActive) return;
+
       const element = document.querySelector(
         `[data-item-id="${it.id}"]`
       ) as HTMLElement;
       if (!element) return;
-      animateItemPosition(element, it.posX, it.posY, it.gravityActive || false);
+
+      const prevItem = prevItemsRef.current.find(p => p.id === it.id);
+      animateItemPosition(element, it.posX, it.posY, true, prevItem?.posX, prevItem?.posY);
     });
+
+    // Update ref after animation trigger
+    prevItemsRef.current = items;
   }, [items]);
 
   // Gravity layout and Auto Nesting
   useEffect(() => {
     const hasGravity = items.some((it) => it.gravityActive);
+    const configChanged = lastConfig.marginSize !== marginSize || lastConfig.spacing !== spacing;
+    const isAnyItemDropping = items.some(it => it.isDropping);
 
-    // If we're not auto-nesting and no items have gravity, we don't need to do anything
-    if (canvasWidth === 0 || (!autoNestStickers && !hasGravity)) return;
+    if (canvasWidth === 0 || isAnyItemDropping || (!autoNestStickers && !hasGravity && !configChanged)) {
+      prevItemsRef.current = items;
+      return;
+    }
 
-    const updates = calculateGridLayout(items, canvasWidth, spacing, autoNestStickers);
+    if (configChanged) {
+      setLastConfig({ marginSize, spacing });
+    }
+
+    const updates = calculateGridLayout(items, canvasWidth, spacing, autoNestStickers, marginSize);
 
     setItems((prev) => {
-      // Check if any item actually needs to move to avoid infinite loops
       const needsUpdate = prev.some(it => {
         const update = updates.find((u) => u.id === it.id);
         if (!update) return false;
-        // Check if position changed significantly
         return Math.abs(update.posX - it.posX) > 0.001 || Math.abs(update.posY - it.posY) > 0.001;
       });
 
-      if (!needsUpdate) return prev;
+      if (!needsUpdate && !configChanged) return prev;
 
       return prev.map((it) => {
-        const update = updates.find((u) => u.id === it.id);
+        const update = updates.find((u: any) => u.id === it.id);
         if (update) {
-          return { ...it, posX: update.posX, posY: update.posY, gravityActive: false };
+          const hasMoved = Math.abs(update.posX - it.posX) > 0.001 || Math.abs(update.posY - it.posY) > 0.001;
+
+          const isBeingDragged = isDraggingItem && it.id === selectedId;
+          const shouldFollowLayout = !isBeingDragged && (autoNestStickers || it.gravityActive || configChanged);
+
+          if (!shouldFollowLayout) {
+            // If order changed but we shouldn't follow layout yet (dragging), 
+            // we still need to preserve the gravityActive flag if it's set elsewhere
+            return it;
+          }
+
+          return { ...it, posX: update.posX, posY: update.posY, gravityActive: hasMoved };
         }
         return it;
       });
     });
-  }, [items, canvasWidth, autoNestStickers, spacing, setItems]);
+  }, [items, canvasWidth, autoNestStickers, spacing, marginSize, lastConfig, setItems, isDraggingItem, selectedId]);
 
   // Snap to grid
   useEffect(() => {
@@ -123,7 +138,7 @@ export const useArtboardEffects = (
   useEffect(() => {
     if (onHeaderInfoChange) {
       // Calculate actual gang sheet dimensions from canvas
-      const canvas = document.querySelector(".flex-1.relative.flex.items-center") as HTMLElement;
+      const canvas = document.querySelector("#artboard-main-container") as HTMLElement;
       let gangSheetWidthIn = 24; // default
       let gangSheetHeightIn = 19.5; // default
 
@@ -150,12 +165,18 @@ export const useArtboardEffects = (
         (item.name || `Item #${item.id}`).replace(/\.[^/.]+$/, "")
       );
 
+      // Get selected item name or default to "Gang Sheet"
+      const selectedItem = selectedId ? items.find(item => item.id === selectedId) : null;
+      const displayName = selectedItem
+        ? (selectedItem.name || `Item #${selectedItem.id}`).replace(/\.[^/.]+$/, "")
+        : 'Gang Sheet';
+
       onHeaderInfoChange({
         hasItem: items.length > 0,
         areaSf,
         widthIn: gangSheetWidthIn,
         heightIn: gangSheetHeightIn,
-        name: 'Gang Sheet',
+        name: displayName,
         price: totalPrice,
         imageNames,
       });

@@ -139,18 +139,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems: initialCartI
               <div className="flex flex-col items-center">
                 <div
                   ref={(el) => (stepperRefs.current[i] = el)}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-300 ${
-                    i <= step
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-600"
-                  }`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-300 ${i <= step
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-600"
+                    }`}
                 >
                   {i + 1}
                 </div>
                 <span
-                  className={`mt-2 text-xs font-medium ${
-                    i <= step ? "text-gray-900" : "text-gray-400"
-                  }`}
+                  className={`mt-2 text-xs font-medium ${i <= step ? "text-gray-900" : "text-gray-400"
+                    }`}
                 >
                   {s}
                 </span>

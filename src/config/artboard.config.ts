@@ -10,8 +10,8 @@ export const ZOOM = {
 // Canvas configuration
 export const CANVAS = {
   PIXELS_PER_INCH: 96,
-  DEFAULT_MARGIN: 1.0,
-  DEFAULT_SPACING: 0.5,
+  DEFAULT_MARGIN: 0.15,
+  DEFAULT_SPACING: 0.1,
   TOP_CENTER_Y: 1.0,
 } as const;
 
@@ -32,7 +32,7 @@ export const ANIMATION = {
   SHAKE_DURATION: 0.1,
   SHAKE_DISTANCE: 5,
   SHAKE_REPEATS: 3,
-  GRAVITY_DURATION: 2,
+  GRAVITY_DURATION: 0.8,
   NORMAL_DURATION: 0.3,
   ZOOM_TRANSITION: "200ms",
 } as const;

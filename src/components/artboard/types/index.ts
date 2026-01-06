@@ -21,6 +21,7 @@ export interface ArtboardItem {
   originalUrl?: string;
   originalWidthIn?: number;
   originalHeightIn?: number;
+  isDropping?: boolean;
 }
 
 export interface ArtboardProps {

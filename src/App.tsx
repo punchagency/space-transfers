@@ -39,6 +39,7 @@ export default function App() {
   }>>([]);
   const [artboardData, setArtboardData] = useState<any>(null);
   const [loadedDesignData, setLoadedDesignData] = useState<any>(null);
+  const [cartWarning, setCartWarning] = useState<string | null>(null);
 
   // Settings State lifted from Sidebar
   const [settings, setSettings] = useState({
@@ -47,8 +48,8 @@ export default function App() {
     showMargins: false,
     snapToGrid: false,
     autoNestStickers: false,
-    spacing: 0.6,
-    marginSize: 0.25,
+    spacing: 0.1,
+    marginSize: 0.15,
   });
 
   const updateSetting = (key: keyof typeof settings, value: any) => {
@@ -57,6 +58,14 @@ export default function App() {
 
   const handleAddGangSheetToCart = async () => {
     try {
+      // Prevent adding duplicate gang sheet to cart
+      const existingGangSheet = cartItems.find(item => item.type === 'gangsheet');
+      if (existingGangSheet) {
+        setCartWarning('This gang sheet has already been added to your cart.');
+        setTimeout(() => setCartWarning(null), 8000);
+        return;
+      }
+
       // Add gang sheet without image first
       const gangSheetItem = {
         id: Date.now(),
@@ -70,11 +79,11 @@ export default function App() {
         copies: 1,
       };
       setCartItems(prev => [...prev, gangSheetItem]);
-      
+
       // Try to capture image in background
       try {
         const imageDataUrl = await captureArtboard();
-        setCartItems(prev => prev.map(item => 
+        setCartItems(prev => prev.map(item =>
           item.id === gangSheetItem.id ? { ...item, image: imageDataUrl } : item
         ));
       } catch (captureError) {
@@ -105,22 +114,42 @@ export default function App() {
 
   if (showHome) {
     return (
-      <div className="flex flex-col h-screen w-screen bg-white">
-        <Header 
-          info={headerInfo} 
-          onMenuClick={() => setIsSidebarOpen(true)} 
-          onCartClick={() => setShowCheckoutModal(true)} 
+      <div className="relative flex flex-col h-screen w-screen bg-white">
+        <Header
+          info={headerInfo}
+          onMenuClick={() => setIsSidebarOpen(true)}
+          onCartClick={() => setShowCheckoutModal(true)}
           cartCount={cartItems.length}
           onAddGangSheetToCart={handleAddGangSheetToCart}
         />
-        <Artboard 
-          onHeaderInfoChange={setHeaderInfo} 
-          showRulers={settings.showRulers} 
-          showGrid={settings.showGrid} 
-          snapToGrid={settings.snapToGrid} 
-          showMargins={settings.showMargins} 
-          marginSize={settings.marginSize} 
-          autoNestStickers={settings.autoNestStickers} 
+        {cartWarning && (
+          <div className="absolute mt-10 top-10 left-1/2 -translate-x-1/2 z-50">
+            <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-500 px-4 py-2 shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <p
+                style={{
+                  fontFamily: "Roboto",
+                  fontWeight: 500,
+                  fontSize: "13px",
+                  lineHeight: "20px",
+                  letterSpacing: "0px",
+                  color: "#1D4ED8",
+                   
+                }}
+              >
+                {cartWarning}
+              </p>
+            </div>
+          </div>
+        )}
+        <Artboard
+          onHeaderInfoChange={setHeaderInfo}
+          showRulers={settings.showRulers}
+          showGrid={settings.showGrid}
+          snapToGrid={settings.snapToGrid}
+          showMargins={settings.showMargins}
+          marginSize={settings.marginSize}
+          autoNestStickers={settings.autoNestStickers}
           spacing={settings.spacing}
           onDataChange={setArtboardData}
           initialData={loadedDesignData}
@@ -135,8 +164,8 @@ export default function App() {
           onOpenLoadModal={() => { setShowLoadModal(true); setIsSidebarOpen(false); }}
           onOpenAccountModal={() => { setShowAccountModal(true); setIsSidebarOpen(false); }}
         />
-        <SaveGangSheetModal 
-          isOpen={showSaveModal} 
+        <SaveGangSheetModal
+          isOpen={showSaveModal}
           onClose={() => setShowSaveModal(false)}
           artboardData={artboardData}
           onSave={(title: string, thumbnail: string, data: any) => {
@@ -152,8 +181,8 @@ export default function App() {
             setShowSaveModal(false);
           }}
         />
-        <LoadGangSheetModal 
-          isOpen={showLoadModal} 
+        <LoadGangSheetModal
+          isOpen={showLoadModal}
           onClose={() => setShowLoadModal(false)}
           designs={savedDesigns}
           onLoad={(id) => {
@@ -177,8 +206,8 @@ export default function App() {
             setSavedDesigns(prev => prev.filter(d => d.id !== id));
           }}
         />
-        <AccountSettingsModal 
-          isOpen={showAccountModal} 
+        <AccountSettingsModal
+          isOpen={showAccountModal}
           onClose={() => setShowAccountModal(false)}
           onOpenOrderHistory={() => {
             setShowAccountModal(false);
@@ -197,8 +226,8 @@ export default function App() {
             setShowOrderDetailsModal(true);
           }}
         />
-        <OrderDetailsModal 
-          isOpen={showOrderDetailsModal} 
+        <OrderDetailsModal
+          isOpen={showOrderDetailsModal}
           onClose={() => setShowOrderDetailsModal(false)}
         />
         <CheckoutModal

@@ -1,21 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 export const useCanvasWidth = () => {
-  const [canvasWidth, setCanvasWidth] = useState(0);
+    const [width, setWidth] = useState(24);
 
-  useEffect(() => {
-    const updateCanvasWidth = () => {
-      const canvas = document.querySelector(
-        ".flex-1.relative.flex.items-center"
-      ) as HTMLElement;
-      if (canvas) {
-        setCanvasWidth(canvas.offsetWidth / 96);
-      }
-    };
-    updateCanvasWidth();
-    window.addEventListener("resize", updateCanvasWidth);
-    return () => window.removeEventListener("resize", updateCanvasWidth);
-  }, []);
+    useEffect(() => {
+        const updateWidth = () => {
+            const canvas = document.querySelector("#artboard-main-container") as HTMLElement;
+            if (canvas) {
+                // Return width in inches (96 DPI)
+                setWidth(canvas.offsetWidth / 96);
+            }
+        };
 
-  return canvasWidth;
+        // Initial update
+        updateWidth();
+
+        // Update on resize
+        window.addEventListener('resize', updateWidth);
+
+        // Also update if the container changes (e.g. sidebar open/close)
+        const observer = new ResizeObserver(updateWidth);
+        const container = document.querySelector("#artboard-main-container");
+        if (container) {
+            observer.observe(container);
+        }
+
+        return () => {
+            window.removeEventListener('resize', updateWidth);
+            observer.disconnect();
+        };
+    }, []);
+
+    return width;
 };

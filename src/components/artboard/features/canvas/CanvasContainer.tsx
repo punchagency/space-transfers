@@ -34,6 +34,7 @@ interface CanvasContainerProps {
   onDragStart: (e: React.MouseEvent, id: number) => void;
   onResizeStart: (e: React.MouseEvent, id: number) => void;
   isDraggingItem: boolean;
+  canvasWidth: number;
 }
 
 export default function CanvasContainer({
@@ -63,6 +64,7 @@ export default function CanvasContainer({
   onDragStart,
   onResizeStart,
   isDraggingItem,
+  canvasWidth,
 }: CanvasContainerProps) {
   return (
     <div
@@ -118,6 +120,8 @@ export default function CanvasContainer({
                 onDragStart={(e) => onDragStart(e, it.id)}
                 onResizeStart={(e) => onResizeStart(e, it.id)}
                 isDragging={isDraggingItem}
+                canvasWidth={canvasWidth}
+                marginSize={marginSize}
               />
             ))
           ) : (

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { readDPI, loadImageSize } from "../../lib/utils";
-import { animateToPosition, animateBounce, animateShake } from "../../lib/utils";
-import { calculateGridLayout, calculateDropPosition } from "../../lib/utils";
+import { readDPI, loadImageSize } from "../utils";
+import { animateBounce, animateShake, animateItemPosition } from "../utils";
+import { calculateGridLayout } from "../utils";
 import { ArtboardItem } from "../../types";
+import { gsap } from "gsap";
 
 export const useDropHandler = (
   items: ArtboardItem[],
@@ -11,7 +12,10 @@ export const useDropHandler = (
   setCounter: React.Dispatch<React.SetStateAction<number>>,
   setSelectedId: React.Dispatch<React.SetStateAction<number | null>>,
   canvasWidth: number,
-  zoom: number
+  zoom: number,
+  autoNestStickers: boolean,
+  spacing: number,
+  marginSize: number
 ) => {
   const [isDragging, setIsDragging] = useState(false);
   const [lowDpiCount, setLowDpiCount] = useState(0);
@@ -34,9 +38,9 @@ export const useDropHandler = (
     if (dropped.length === 0) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const dropX = (e.clientX - rect.left) / (96 * zoom);
-    const dropY = (e.clientY - rect.top) / (96 * zoom);
-    const topCenterY = 1.0;
+    const zoomVal = zoom || 1;
+    const dropX = (e.clientX - rect.left) / (96 * zoomVal);
+    const dropY = (e.clientY - rect.top) / (96 * zoomVal);
 
     const start = counter + 1;
     let lowDpiImages = 0;
@@ -67,7 +71,8 @@ export const useDropHandler = (
           price: 12.34,
           name: file.name,
           gravityActive: false,
-        };
+          isDropping: true,
+        } as ArtboardItem;
       })
     );
 
@@ -76,44 +81,114 @@ export const useDropHandler = (
       setTimeout(() => setLowDpiCount(0), 8000);
     }
 
-    setItems((prev) => [...prev, ...created]);
-
+    // 1. Calculate the final intended layout for ALL items immediately
     setTimeout(() => {
-      created.forEach((newItem) => {
-        const element = document.querySelector(
-          `[data-item-id="${newItem.id}"]`
-        ) as HTMLElement;
-        if (element) {
-          const { targetX, targetY } = calculateDropPosition(
-            items,
-            newItem,
-            canvasWidth,
-            topCenterY
-          );
+      const artboardContainer = document.querySelector("#artboard-main-container") as HTMLElement;
+      const currentCanvasWidth = artboardContainer ? artboardContainer.offsetWidth / 96 : (canvasWidth || 24);
 
-          animateToPosition(element, targetX, targetY, () => {
-            animateBounce(element, targetY, () => {
-              items.forEach((it) => {
-                const existingElement = document.querySelector(
-                  `[data-item-id="${it.id}"]`
-                ) as HTMLElement;
-                if (existingElement) animateShake(existingElement);
-              });
+      const allItems = [...created, ...items];
+      const finalUpdates = calculateGridLayout(allItems, currentCanvasWidth, spacing, autoNestStickers, marginSize);
 
-              setTimeout(() => {
-                setItems((prev) => {
-                  const allItems = [...prev];
-                  const updates = calculateGridLayout(allItems, canvasWidth, 0.5, false);
-                  return allItems.map((it) => {
-                    const update = updates.find((u) => u.id === it.id);
-                    return update ? { ...it, ...update, gravityActive: true } : it;
-                  });
-                });
-              }, 400);
-            });
-          });
-        }
+      // 2. Update state IMMEDIATELY but only for NEW items. 
+      // Keep old items at their current positions to prevent "snapping" before they are pushed.
+      setItems((prev) => {
+        const withCreated = [...created, ...prev];
+        return withCreated.map(it => {
+          const isNew = created.some(c => c.id === it.id);
+          if (isNew) {
+            const update = finalUpdates.find(u => u.id === it.id);
+            if (update) {
+              return { ...it, posX: update.posX, posY: update.posY, gravityActive: false };
+            }
+          }
+          return it;
+        });
       });
+
+      // 3. Perform the physical interaction sequence
+      setTimeout(() => {
+        const PPI = 96;
+
+        // Calculate items that need to be pushed
+        const itemsToPush = finalUpdates.filter(u => {
+          const existing = items.find(ex => ex.id === u.id);
+          return existing && (Math.abs(u.posX - existing.posX) > 0.01 || Math.abs(u.posY - existing.posY) > 0.01);
+        });
+
+        const pushedIds = new Set(itemsToPush.map(p => p.id));
+        const newIds = new Set(created.map(c => c.id));
+
+        // A. CONTACT POINT: Trigger 'Physical Shove' with progressive ripple (Domino effect)
+        gsap.delayedCall(2.4, () => {
+          // 1. Update React state for ALL affected items at once
+          setItems(prev => prev.map(it => {
+            const update = finalUpdates.find(u => u.id === it.id);
+            const isNew = newIds.has(it.id);
+            if (isNew) return { ...it, isDropping: false };
+            if (update && pushedIds.has(it.id)) {
+              return { ...it, posX: update.posX, posY: update.posY, gravityActive: true };
+            }
+            return it;
+          }));
+
+          // 2. Trigger staggered physical animations
+          const sortedToPush = [...itemsToPush].sort((a, b) => {
+            const indexA = finalUpdates.findIndex(u => u.id === a.id);
+            const indexB = finalUpdates.findIndex(u => u.id === b.id);
+            return indexA - indexB;
+          });
+
+          sortedToPush.forEach((u, index) => {
+            const existing = items.find(ex => ex.id === u.id);
+            if (!existing) return;
+            const el = document.querySelector(`[data-item-id="${u.id}"]`) as HTMLElement;
+            if (el) {
+              gsap.delayedCall(index * 0.08, () => {
+                animateItemPosition(el, u.posX, u.posY, true, existing.posX, existing.posY);
+              });
+            }
+          });
+        });
+
+        // B. SETTLE POINT: Shake nearby items that WERE NOT pushed
+        gsap.delayedCall(3.3, () => {
+          finalUpdates.forEach((u) => {
+            if (!pushedIds.has(u.id) && !newIds.has(u.id)) {
+              const el = document.querySelector(`[data-item-id="${u.id}"]`) as HTMLElement;
+              if (el) animateShake(el);
+            }
+          });
+        });
+
+        // C. INDIVIDUAL ANIMATIONS FOR NEW ITEMS
+        created.forEach((item) => {
+          const update = finalUpdates.find(u => u.id === item.id);
+          if (!update) return;
+
+          const element = document.querySelector(`[data-item-id="${item.id}"]`) as HTMLElement;
+          if (!element) return;
+
+          gsap.fromTo(element,
+            {
+              left: `${(dropX - item.widthIn / 2) * PPI}px`,
+              top: `${(dropY - item.heightIn / 2) * PPI}px`,
+              scale: 1.2,
+              opacity: 0,
+            },
+            {
+              left: `${update.posX * PPI}px`,
+              top: `${update.posY * PPI}px`,
+              scale: 1,
+              opacity: 1,
+              duration: 3.0,
+              ease: "power2.out",
+              onComplete: () => {
+                animateBounce(element, update.posY);
+              }
+            }
+          );
+        });
+      }, 50);
     }, 50);
 
     setCounter(start + dropped.length - 1);
