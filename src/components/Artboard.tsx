@@ -32,7 +32,10 @@ export default function Artboard({
     setCounter,
     setSelectedId,
     canvasWidth,
-    zoom
+    zoom,
+    autoNestStickers,
+    spacing,
+    marginSize
   );
   const itemActions = useItemActions(items, setItems, selectedId, snapToGrid, snapToGridPoint);
   const { handleResizeStart, handleDragStart, isDraggingItem } = useMouseInteractions(
@@ -53,6 +56,8 @@ export default function Artboard({
     canvasWidth,
     spacing,
     autoNestStickers,
+    marginSize,
+    isDraggingItem,
     onHeaderInfoChange,
     initialData,
     onDataChange,
@@ -76,7 +81,7 @@ export default function Artboard({
 
 
   return (
-    <div className="flex-1 relative bg-gray-50 overflow-hidden flex flex-col artboard-capture-area">
+    <div id="artboard-main-container" className="flex-1 relative bg-gray-50 overflow-hidden flex flex-col artboard-capture-area">
       <DpiWarning count={lowDpiCount} />
       <div className="flex-1 flex relative">
         <CanvasContainer
@@ -84,6 +89,7 @@ export default function Artboard({
           showRulers={showRulers}
           showMargins={showMargins}
           marginSize={marginSize}
+          canvasWidth={canvasWidth}
           isDragging={isDragging}
           items={items}
           selectedId={selectedId}

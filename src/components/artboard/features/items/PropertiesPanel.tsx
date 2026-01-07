@@ -24,6 +24,7 @@ interface PropertiesPanelProps {
   onSetPosX: (n: number) => void;
   onSetPosY: (n: number) => void;
   onAddToCart: () => void;
+  position?: 'left' | 'right';
 }
 
 export default function PropertiesPanel({
@@ -38,10 +39,11 @@ export default function PropertiesPanel({
   onSetPosX,
   onSetPosY,
   onAddToCart,
+  position = 'right',
 }: PropertiesPanelProps) {
   return (
     <div
-      className="absolute top-0 left-full ml-3 z-50 w-60 bg-white border border-gray-300 shadow-2xl rounded-xl"
+      className={`absolute top-0 ${position === 'right' ? 'left-full ml-3' : 'right-full mr-3'} z-50 w-60 bg-white border border-gray-300 shadow-2xl rounded-xl`}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-300">
@@ -81,7 +83,23 @@ export default function PropertiesPanel({
           type="number"
           min={1}
           value={item.copies}
-          onChange={(e) => onSetCopies(Math.max(1, parseInt(e.target.value || "1")))}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '') {
+              return; // Allow empty input while typing
+            }
+            const numValue = parseInt(value, 10);
+            if (!isNaN(numValue) && numValue >= 1) {
+              onSetCopies(numValue);
+            }
+          }}
+          onBlur={(e) => {
+            const value = e.target.value;
+            const numValue = parseInt(value, 10);
+            if (value === '' || isNaN(numValue) || numValue < 1) {
+              onSetCopies(1);
+            }
+          }}
           className="w-full h-6 px-2 border border-gray-300 rounded-md text-[8px] bg-[#F3F3F5]"
         />
       </div>

@@ -39,8 +39,6 @@ export const useMouseInteractions = (
   };
 
   const handleDragStart = (e: React.MouseEvent, itemId: number) => {
-    if (autoNestStickers) return; // Prevent dragging when auto-nest is on
-
     const item = items.find((it) => it.id === itemId);
     if (!item || item.locked) return;
     setIsDraggingItem(true);
@@ -101,13 +99,56 @@ export const useMouseInteractions = (
       const deltaY = (e.clientY - dragStart.y) / (96 * zoom);
       const newPosX = dragStart.posX + deltaX;
       const newPosY = dragStart.posY + deltaY;
-      const finalX = snapToGrid ? snapToGridPoint(newPosX) : newPosX;
-      const finalY = snapToGrid ? snapToGridPoint(newPosY) : newPosY;
-      setItems((prev) =>
-        prev.map((it) =>
-          it.id === selectedId ? { ...it, posX: finalX, posY: finalY } : it
-        )
-      );
+
+      if (autoNestStickers) {
+        setItems((prev) => {
+          const others = prev.filter(it => it.id !== selectedId);
+          const dragged = prev.find(it => it.id === selectedId);
+          if (!dragged) return prev;
+
+          // Find the best new index based on center-point proximity
+          let targetIndex = 0;
+          let minDistance = Infinity;
+
+          others.forEach((it, idx) => {
+            const dist = Math.sqrt(
+              Math.pow(it.posX + it.widthIn / 2 - (newPosX + dragged.widthIn / 2), 2) +
+              Math.pow(it.posY + it.heightIn / 2 - (newPosY + dragged.heightIn / 2), 2)
+            );
+
+            if (dist < minDistance) {
+              minDistance = dist;
+              // If mouse center is more towards the right of this item's center, it goes after
+              targetIndex = (newPosX + dragged.widthIn / 2) > (it.posX + it.widthIn / 2) ? idx + 1 : idx;
+            }
+          });
+
+          const oldIndex = prev.findIndex(it => it.id === selectedId);
+          if (oldIndex === targetIndex) {
+            return prev.map(it => it.id === selectedId ? { ...it, posX: newPosX, posY: newPosY } : it);
+          }
+
+          // Order changed! Create new array order
+          const newItems = [...others];
+          newItems.splice(targetIndex, 0, { ...dragged, posX: newPosX, posY: newPosY, gravityActive: false });
+
+          return newItems.map((it, idx) => {
+            const indexChanged = idx !== prev.findIndex(p => p.id === it.id);
+            return {
+              ...it,
+              gravityActive: it.id !== selectedId && indexChanged
+            };
+          });
+        });
+      } else {
+        const finalX = snapToGrid ? snapToGridPoint(newPosX) : newPosX;
+        const finalY = snapToGrid ? snapToGridPoint(newPosY) : newPosY;
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === selectedId ? { ...it, posX: finalX, posY: finalY } : it
+          )
+        );
+      }
     };
 
     const handleMouseUp = () => {

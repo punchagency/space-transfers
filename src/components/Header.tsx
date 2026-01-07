@@ -29,19 +29,15 @@ export default function Header({ info, onMenuClick, onCartClick, cartCount, onAd
             {(info?.widthIn ?? 24).toFixed(2)}in wide x {(info?.heightIn ?? 19.5).toFixed(2)}in long
           </span>
           <span className="text-gray-300">|</span>
-          <span className="font-medium max-w-xs truncate" title={info?.imageNames?.join(', ')}>
-            {info?.imageNames && info.imageNames.length > 0
-              ? info.imageNames.length <= 3
-                ? info.imageNames.join(', ')
-                : `${info.imageNames.slice(0, 2).join(', ')} + ${info.imageNames.length - 2} more`
-              : 'Gang Sheet'}
+          <span className="font-medium max-w-xs truncate" title={info?.name}>
+            {info?.name || 'Gang Sheet'}
           </span>
           <span className="text-gray-300">|</span>
           <span>${(info?.price ?? 0).toFixed(2)}</span>
         </div>
         <button
           onClick={onAddGangSheetToCart}
-          className="px-3  text-sm font-medium  text-black bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors"
+          className="px-3 text-sm font-medium rounded-2xl text-black bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
         >
           Add to Cart
         </button>
