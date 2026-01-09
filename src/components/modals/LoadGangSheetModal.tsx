@@ -126,7 +126,7 @@ const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose
                   </div>
                 </div>
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
+                  <button
                     className="flex items-center gap-1 text-gray-700 hover:text-gray-900"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -136,7 +136,7 @@ const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose
                     <MdEdit className="h-4 w-4" />
                     <span className="text-[12px]">Rename</span>
                   </button>
-                  <button 
+                  <button
                     className="flex items-center gap-1 text-gray-700 hover:text-gray-900"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -146,7 +146,7 @@ const LoadGangSheetModal: React.FC<LoadGangSheetModalProps> = ({ isOpen, onClose
                     <MdContentCopy className="h-4 w-4" />
                     <span className="text-[12px]">Duplicate</span>
                   </button>
-                  <button 
+                  <button
                     className="hover:text-gray-700"
                     onClick={(e) => {
                       e.stopPropagation();

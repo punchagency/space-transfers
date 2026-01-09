@@ -15,7 +15,8 @@ export const useDropHandler = (
   zoom: number,
   autoNestStickers: boolean,
   spacing: number,
-  marginSize: number
+  marginSize: number,
+  showRulers: boolean
 ) => {
   const [isDragging, setIsDragging] = useState(false);
   const [lowDpiCount, setLowDpiCount] = useState(0);
@@ -87,7 +88,10 @@ export const useDropHandler = (
       const currentCanvasWidth = artboardContainer ? artboardContainer.offsetWidth / 96 : (canvasWidth || 24);
 
       const allItems = [...created, ...items];
-      const finalUpdates = calculateGridLayout(allItems, currentCanvasWidth, spacing, autoNestStickers, marginSize);
+      const offsetInches = 20 / 96;
+      const effectiveMargin = marginSize + offsetInches;
+
+      const finalUpdates = calculateGridLayout(allItems, currentCanvasWidth, spacing, autoNestStickers, effectiveMargin);
 
       // 2. Update state IMMEDIATELY but only for NEW items. 
       // Keep old items at their current positions to prevent "snapping" before they are pushed.

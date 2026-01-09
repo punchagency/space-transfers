@@ -19,29 +19,19 @@ export const animateToPosition = (
 export const animateBounce = (element: HTMLElement, targetY: number, onImpact?: () => void, onComplete?: () => void) => {
     const tl = gsap.timeline({ onComplete });
     const startY = targetY * CANVAS.PIXELS_PER_INCH;
-    const bounceHeight = 0.2 * CANVAS.PIXELS_PER_INCH;
+    const bounceHeight = 0.1 * CANVAS.PIXELS_PER_INCH; // Smaller bounce
 
-    // Subtle impact bounce
+    // Single small subtle bounce
     tl.to(element, {
         top: `${startY + bounceHeight}px`,
-        duration: 0.3,
-        ease: "power2.in", // Harder landing
+        duration: 0.25,
+        ease: "power2.in",
         onComplete: onImpact
     })
         .to(element, {
             top: `${startY}px`,
-            duration: 0.4,
+            duration: 0.5,
             ease: "back.out(2)",
-        })
-        .to(element, {
-            top: `${startY + bounceHeight * 0.3}px`,
-            duration: 0.3,
-            ease: "sine.inOut",
-        })
-        .to(element, {
-            top: `${startY}px`,
-            duration: 0.6,
-            ease: "power2.out",
         });
 };
 

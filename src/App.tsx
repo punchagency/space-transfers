@@ -73,10 +73,14 @@ export default function App() {
         type: 'gangsheet',
         image: '/placeholder-gangsheet.png',
         items: artboardData?.items || [],
-        price: artboardData?.items?.reduce((sum: number, item: any) => sum + (item.price * item.copies), 0) || 0,
-        widthIn: 24,
-        heightIn: 19.5,
+        price: headerInfo?.price || 0,
+        widthIn: headerInfo?.widthIn || 24,
+        heightIn: headerInfo?.heightIn || 19.5,
+        size: `${(headerInfo?.widthIn || 24).toFixed(1)}" × ${(headerInfo?.heightIn || 19.5).toFixed(1)}"`,
         copies: 1,
+        color: 'N/A',
+        design: 'Custom Gang Sheet',
+        print: 'DTF Transfer',
       };
       setCartItems(prev => [...prev, gangSheetItem]);
 
@@ -134,7 +138,7 @@ export default function App() {
                   lineHeight: "20px",
                   letterSpacing: "0px",
                   color: "#1D4ED8",
-                   
+
                 }}
               >
                 {cartWarning}

@@ -57,9 +57,15 @@ export default function PropertiesPanel({
       <div className="px-3 py-2 flex items-center justify-between">
         <div className="text-[10px]">
           <div className="font-medium text-gray-900">{item.name || `Item #${item.id}`}</div>
-          <div className="text-gray-500">Linked copies</div>
+          <div className="text-gray-500">
+            {item.copies > 1 ? `${item.copies} linked copies` : '1 copy'}
+          </div>
         </div>
-        <div className="text-[10px] font-semibold text-gray-900">${item.price.toFixed(2)}/each</div>
+        <div className="text-[10px] font-semibold text-gray-900">
+          {item.copies > 1
+            ? `$${(item.price * item.copies).toFixed(2)} total`
+            : `$${item.price.toFixed(2)}/each`}
+        </div>
       </div>
       <div className="px-3 py-2 border-t border-gray-300 flex items-center justify-between">
         <div>
@@ -107,11 +113,11 @@ export default function PropertiesPanel({
         <div className="flex items-center justify-between mb-2">
           <div className="text-[10px] font-medium text-gray-900">Dimensions</div>
           <button
-            className={`p-1 rounded ${item.linked ? "text-blue-600" : "text-gray-600"}`}
+            className={`text-[10px] font-medium transition-colors hover:underline ${item.linked ? "text-blue-600" : "text-gray-400"}`}
             onClick={onToggleLinked}
-            title={item.linked ? "Linked" : "Unlinked"}
+            title={item.linked ? "Click to Unlink" : "Click to Link"}
           >
-            <MdLink className="w-4 h-4" />
+            {item.linked ? "Linked" : "Unlinked"}
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">

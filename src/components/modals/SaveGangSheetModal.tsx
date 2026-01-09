@@ -26,21 +26,21 @@ const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
       const rect = artboard.getBoundingClientRect();
       canvas.width = rect.width * 0.5;
       canvas.height = rect.height * 0.5;
-      
+
       if (ctx) {
         const gridBg = artboard.querySelector('.absolute.inset-0.z-0') as HTMLElement;
         if (gridBg) {
           const bgStyle = window.getComputedStyle(gridBg);
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
+
           const pattern = ctx.createPattern(await createPatternCanvas(bgStyle), 'repeat');
           if (pattern) {
             ctx.fillStyle = pattern;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
         }
-        
+
         const images = artboard.querySelectorAll('img[alt="dropped"]');
         for (const img of Array.from(images)) {
           const htmlImg = img as HTMLImageElement;
@@ -54,7 +54,7 @@ const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
             ctx.drawImage(htmlImg, x, y, w, h);
           }
         }
-        
+
         const thumbnail = canvas.toDataURL('image/png');
         onSave(designName, thumbnail, artboardData);
         setDesignName("Untitled Design");
@@ -134,7 +134,7 @@ const SaveGangSheetModal: React.FC<SaveGangSheetModalProps> = ({
           >
             Cancel
           </button>
-          <button 
+          <button
             className="inline-flex items-center bg-[#00A63E] text-white px-2.5 py-2 rounded-lg hover:bg-[#00A63E]"
             onClick={handleSave}
           >

@@ -14,6 +14,7 @@ export const useArtboardEffects = (
   autoNestStickers: boolean,
   marginSize: number,
   isDraggingItem: boolean,
+  showRulers: boolean,
   onHeaderInfoChange?: (info: any) => void,
   initialData?: any,
   onDataChange?: (data: any) => void,
@@ -73,7 +74,11 @@ export const useArtboardEffects = (
       setLastConfig({ marginSize, spacing });
     }
 
-    const updates = calculateGridLayout(items, canvasWidth, spacing, autoNestStickers, marginSize);
+    // Add fixed 20px offset to match CanvasMargins visual position
+    const offsetInches = 20 / 96;
+    const effectiveMargin = marginSize + offsetInches;
+
+    const updates = calculateGridLayout(items, canvasWidth, spacing, autoNestStickers, effectiveMargin);
 
     setItems((prev) => {
       const needsUpdate = prev.some(it => {
@@ -137,16 +142,11 @@ export const useArtboardEffects = (
   // Header info change
   useEffect(() => {
     if (onHeaderInfoChange) {
-      // Calculate actual gang sheet dimensions from canvas
-      const canvas = document.querySelector("#artboard-main-container") as HTMLElement;
-      let gangSheetWidthIn = 24; // default
-      let gangSheetHeightIn = 19.5; // default
-
-      if (canvas) {
-        // Convert pixels to inches (96 DPI)
-        gangSheetWidthIn = canvas.offsetWidth / 96;
-        gangSheetHeightIn = canvas.offsetHeight / 96;
-      }
+      // Use exact ruler dimensions
+      // Top ruler: 24 inches
+      // Left ruler: 19.5 inches (24 inches height - ruler offset)
+      const gangSheetWidthIn = 24;
+      const gangSheetHeightIn = 19.5;
 
       const areaSf = +((gangSheetWidthIn * gangSheetHeightIn) / 144).toFixed(2);
 
@@ -169,7 +169,7 @@ export const useArtboardEffects = (
       const selectedItem = selectedId ? items.find(item => item.id === selectedId) : null;
       const displayName = selectedItem
         ? (selectedItem.name || `Item #${selectedItem.id}`).replace(/\.[^/.]+$/, "")
-        : 'Gang Sheet';
+        : 'Instant Hot Peel';
 
       onHeaderInfoChange({
         hasItem: items.length > 0,

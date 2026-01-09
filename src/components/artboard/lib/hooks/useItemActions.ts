@@ -131,9 +131,45 @@ export const useItemActions = (
 
   const toggleLinked = () => {
     if (selectedId == null) return;
-    setItems((prev) =>
-      prev.map((it) => (it.id === selectedId ? { ...it, linked: !it.linked } : it))
-    );
+
+    setItems((prev) => {
+      const item = prev.find((it) => it.id === selectedId);
+      if (!item) return prev;
+
+      // If item has copies, ungroup them instead of toggling aspect ratio link
+      if (item.copies > 1) {
+        const newItems: ArtboardItem[] = [];
+        const cols = Math.ceil(Math.sqrt(item.copies));
+        const gap = 0.05; // 4.8px ≈ 0.05 inches
+
+        for (let i = 0; i < item.copies; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+
+          const xOffset = col * (item.widthIn + gap);
+          const yOffset = row * (item.heightIn + gap);
+
+          // The first item (i=0) keeps the original ID, others get new IDs
+          const newItem = {
+            ...item,
+            id: i === 0 ? item.id : Date.now() + i,
+            copies: 1,
+            posX: item.posX + xOffset,
+            posY: item.posY + yOffset,
+            // Ensure they are selected or handled correctly? 
+            // Maybe deselect or select all? For now just place them.
+          };
+          newItems.push(newItem);
+        }
+
+        // Replace the original item (and any others) with the new list
+        // Filter out original, then add all new
+        return [...prev.filter(it => it.id !== selectedId), ...newItems];
+      }
+
+      // Default behavior: toggle aspect ratio link
+      return prev.map((it) => (it.id === selectedId ? { ...it, linked: !it.linked } : it));
+    });
   };
 
   const setCopies = (n: number) => {

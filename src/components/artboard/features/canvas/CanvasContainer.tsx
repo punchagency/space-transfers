@@ -15,6 +15,7 @@ interface CanvasContainerProps {
   isDragging: boolean;
   items: ArtboardItemType[];
   selectedId: number | null;
+  selectedIds: Set<number>;
   showProperties: Record<number, boolean>;
   addedToCart: Set<number>;
   onWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
@@ -24,9 +25,10 @@ interface CanvasContainerProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onCanvasClick: () => void;
-  onItemSelect: (id: number) => void;
+  onItemSelect: (id: number, multi?: boolean) => void;
   onToggleProperties: (id: number) => void;
   itemActions: any;
+  onLink: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onAddToCart: (item: any) => void;
@@ -45,6 +47,7 @@ export default function CanvasContainer({
   isDragging,
   items,
   selectedId,
+  selectedIds,
   showProperties,
   addedToCart,
   onWheel,
@@ -57,6 +60,7 @@ export default function CanvasContainer({
   onItemSelect,
   onToggleProperties,
   itemActions,
+  onLink,
   onDuplicate,
   onDelete,
   onAddToCart,
@@ -97,12 +101,12 @@ export default function CanvasContainer({
               <ArtboardItem
                 key={it.id}
                 item={it}
-                isSelected={selectedId === it.id}
+                isSelected={selectedId === it.id || selectedIds.has(it.id)}
                 showProperties={showProperties[it.id] || false}
                 addedToCart={addedToCart.has(it.id)}
-                onSelect={() => onItemSelect(it.id)}
+                onSelect={(multi) => onItemSelect(it.id, multi)}
                 onToggleProperties={() => onToggleProperties(it.id)}
-                onExpand={itemActions.toggleExpandSelected}
+                onLink={onLink}
                 onRotate={itemActions.rotateSelected}
                 onToggleLock={itemActions.toggleLockSelected}
                 onFlip={itemActions.flipSelected}
