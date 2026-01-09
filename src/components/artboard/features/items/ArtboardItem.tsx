@@ -24,9 +24,9 @@ interface ArtboardItemProps {
     isSelected: boolean;
     showProperties: boolean;
     addedToCart: boolean;
-    onSelect: () => void;
+    onSelect: (multi?: boolean) => void;
     onToggleProperties: () => void;
-    onExpand: () => void;
+    onLink: () => void;
     onRotate: () => void;
     onToggleLock: () => void;
     onFlip: () => void;
@@ -55,7 +55,7 @@ export default function ArtboardItem({
     addedToCart,
     onSelect,
     onToggleProperties,
-    onExpand,
+    onLink,
     onRotate,
     onToggleLock,
     onFlip,
@@ -91,23 +91,23 @@ export default function ArtboardItem({
             }}
             onClick={(e) => {
                 e.stopPropagation();
-                if (isSelected && !showProperties) {
+                if (isSelected && !showProperties && !e.shiftKey) {
                     onToggleProperties();
-                } else if (!isSelected) {
-                    onSelect();
+                } else {
+                    onSelect(e.shiftKey);
                 }
             }}
         >
             {isSelected && (
                 <ItemToolbar
                     locked={item.locked}
-                    onExpand={onExpand}
+                    onLink={onLink}
                     onRotate={onRotate}
                     onToggleLock={onToggleLock}
                     onFlip={onFlip}
                     onDuplicate={onDuplicate}
                     onDelete={onDelete}
-                    position={item.posY <= 0.5 ? 'bottom' : 'top'}
+                    position={item.posY <= marginSize + 0.3 ? 'bottom' : 'top'}
                 />
             )}
             {isSelected && showProperties && !isDragging && (
@@ -127,31 +127,44 @@ export default function ArtboardItem({
                 />
             )}
             {isSelected && !item.autoCrop && (
-                <div className="absolute top-1 left-2 bg-blue-600 text-white text-xs rounded-xl px-2 h-5 flex items-center gap-1">
+                <div
+                    className="absolute top-1 left-2 bg-blue-600 text-white text-xs rounded-xl px-2 h-5 flex items-center gap-1 cursor-pointer hover:bg-blue-700 pointer-events-auto"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleLinked();
+                    }}
+                >
                     <FiLink className="w-3 h-3" />
                     <span>#{item.id}</span>
                 </div>
             )}
-            {item.copies > 1 && (
-                <div className="absolute bottom-1 right-1 bg-gray-900 text-white text-xs font-bold rounded-full min-w-6 h-6 px-1.5 flex items-center justify-center shadow-lg">
-                    {item.copies}
-                </div>
-            )}
-            <img
-                src={item.url}
-                alt="dropped"
-                className={`${item.expanded ? "max-w-[60vw] max-h-[60vh]" : "max-w-[40vw] max-h-[40vh]"
-                    } object-contain ${!item.locked ? "cursor-move" : "cursor-default"}`}
+            {/* Group Layout for Copies */}
+            <div
+                className="grid"
                 style={{
-                    width: `${item.widthIn * 96}px`,
-                    height: `${item.heightIn * 96}px`,
-                    transform: `scaleX(${item.flipped ? -1 : 1}) rotate(${item.rotation}deg)`,
+                    gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(item.copies))}, max-content)`,
+                    gap: '4.8px' // 0.05 inches * 96 DPI
                 }}
-                onMouseDown={(e) => {
-                    e.stopPropagation();
-                    onDragStart(e);
-                }}
-            />
+            >
+                {Array.from({ length: item.copies }).map((_, index) => (
+                    <img
+                        key={index}
+                        src={item.url}
+                        alt={`copy-${index}`}
+                        className={`${item.expanded ? "max-w-[60vw] max-h-[60vh]" : "max-w-[40vw] max-h-[40vh]"
+                            } object-contain ${!item.locked ? "cursor-move" : "cursor-default"}`}
+                        style={{
+                            width: `${item.widthIn * 96}px`,
+                            height: `${item.heightIn * 96}px`,
+                            transform: `scaleX(${item.flipped ? -1 : 1}) rotate(${item.rotation}deg)`,
+                        }}
+                        onMouseDown={(e) => {
+                            e.stopPropagation();
+                            onDragStart(e);
+                        }}
+                    />
+                ))}
+            </div>
             {isSelected && (
                 <>
                     <span

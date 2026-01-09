@@ -14,6 +14,8 @@ interface CartItem {
   image?: string;
   items?: any[];
   copies?: number;
+  widthIn?: number;
+  heightIn?: number;
 }
 
 interface CartStepProps {
@@ -91,7 +93,11 @@ export default function CartStep({ cartItems, updateQuantity, removeItem }: Cart
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-semibold text-gray-900">{item.name}</h4>
-                    <div className="text-sm text-gray-600 mt-1">Size: {item.size}</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Size: {item.type === 'gangsheet' && item.widthIn && item.heightIn
+                        ? `${item.widthIn.toFixed(1)}" × ${item.heightIn.toFixed(1)}"`
+                        : item.size}
+                    </div>
                     <div className="text-sm text-gray-600">Color: {item.color}</div>
                     <div className="text-sm text-gray-600">Design: {item.design}</div>
                     <div className="text-sm text-gray-600">Print: {item.print}</div>

@@ -10,17 +10,15 @@ export default function RulerSegment({ vertical = false, label }: { vertical?: b
 
   return (
     <div
-      className={`relative ${
-        vertical
-          ? "flex-1 w-full border-t border-gray-300"
-          : "flex-1 h-full border-l border-gray-300"
-      }`}
+      className={`relative ${vertical
+        ? "flex-1 w-full border-t border-gray-300"
+        : "flex-1 h-full border-l border-gray-300"
+        }`}
     >
-      {label !== 0 && (
+      {label !== 0 && label !== 24 && (
         <span
-          className={`absolute text-[9px] text-gray-500 font-medium select-none ${
-            vertical ? "top-1 left-4" : "top-4 left-1"
-          }`}
+          className={`absolute text-[9px] text-gray-500 font-medium select-none ${vertical ? "top-1 left-4" : "top-4 left-1"
+            }`}
         >
           {label}
         </span>
@@ -31,19 +29,19 @@ export default function RulerSegment({ vertical = false, label }: { vertical?: b
 
         const style = vertical
           ? {
-              top: `${tick.pos * 100}%`,
-              left: 0,
-              width: `${lengthPx}px`,
-              height: "1px",
-              transform: "translateY(-0.5px)",
-            }
+            top: `${tick.pos * 100}%`,
+            left: 0,
+            width: `${lengthPx}px`,
+            height: "1px",
+            transform: "translateY(-0.5px)",
+          }
           : {
-              left: `${tick.pos * 100}%`,
-              top: 0,
-              height: `${lengthPx}px`,
-              width: "1px",
-              transform: "translateX(-0.5px)",
-            };
+            left: `${tick.pos * 100}%`,
+            top: 0,
+            height: `${lengthPx}px`,
+            width: "1px",
+            transform: "translateX(-0.5px)",
+          };
 
         return (
           <div

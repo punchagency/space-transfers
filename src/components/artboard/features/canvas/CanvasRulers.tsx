@@ -10,7 +10,8 @@ interface CanvasRulersProps {
 export default function CanvasRulers({ showRulers, zoom }: CanvasRulersProps) {
   if (!showRulers) return null;
 
-  const rulerLengthInches = 24; // Always show 24 inches regardless of screen size
+  const topRulerLengthInches = 24; // Top ruler: 24 inches
+  const leftRulerLengthInches = 19.5; // Left ruler: 19.5 inches
 
   return (
     <>
@@ -24,7 +25,7 @@ export default function CanvasRulers({ showRulers, zoom }: CanvasRulersProps) {
             transformOrigin: "left center",
           }}
         >
-          {Array.from({ length: rulerLengthInches + 1 }).map((_, i) => (
+          {Array.from({ length: topRulerLengthInches + 1 }).map((_, i) => (
             <RulerSegment key={i} label={i} />
           ))}
         </div>
@@ -40,7 +41,7 @@ export default function CanvasRulers({ showRulers, zoom }: CanvasRulersProps) {
             transformOrigin: "top left",
           }}
         >
-          {Array.from({ length: rulerLengthInches + 1 }).map((_, i) => (
+          {Array.from({ length: leftRulerLengthInches + 1 }).map((_, i) => (
             <RulerSegment key={i} label={i} vertical />
           ))}
         </div>

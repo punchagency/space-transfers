@@ -21,6 +21,7 @@ export default function Artboard({
   const [items, setItems] = useState<any[]>([]);
   const [counter, setCounter] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showProperties, setShowProperties] = useState<Record<number, boolean>>({});
   const [addedToCart, setAddedToCart] = useState<Set<number>>(new Set());
 
@@ -35,7 +36,8 @@ export default function Artboard({
     zoom,
     autoNestStickers,
     spacing,
-    marginSize
+    marginSize,
+    showRulers
   );
   const itemActions = useItemActions(items, setItems, selectedId, snapToGrid, snapToGridPoint);
   const { handleResizeStart, handleDragStart, isDraggingItem } = useMouseInteractions(
@@ -58,16 +60,13 @@ export default function Artboard({
     autoNestStickers,
     marginSize,
     isDraggingItem,
+    showRulers,
     onHeaderInfoChange,
     initialData,
     onDataChange,
     counter
   );
-  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.05 : 0.95;
-    setZoom((z) => Math.min(3, Math.max(1, z * factor)));
-  };
+
   const duplicateSelected = () => {
     if (selectedId == null) return;
     const target = items.find((it) => it.id === selectedId);
@@ -79,11 +78,41 @@ export default function Artboard({
     setSelectedId(newId);
   };
 
+  const handleLinkSelected = () => {
+    const selectedItems = items.filter((it) => selectedIds.has(it.id) || it.id === selectedId);
+    // De-dupe by ID
+    const uniqueSelected = Array.from(new Map(selectedItems.map(item => [item.id, item])).values());
+
+    if (uniqueSelected.length < 2) return;
+
+    // Check if all are the same image URL
+    const firstUrl = uniqueSelected[0].url;
+    const allSame = uniqueSelected.every(it => it.url === firstUrl);
+
+    if (allSame) {
+      const totalCopies = uniqueSelected.reduce((sum, it) => sum + it.copies, 0);
+      const primary = uniqueSelected[0];
+
+      const mergedItem = {
+        ...primary,
+        copies: totalCopies,
+        id: Date.now(),
+        linked: false // Reset link state
+      };
+
+      const selectedIdSet = new Set(uniqueSelected.map(it => it.id));
+      const remainingItems = items.filter(it => !selectedIdSet.has(it.id));
+
+      setItems([...remainingItems, mergedItem]);
+      setSelectedId(mergedItem.id);
+      setSelectedIds(new Set([mergedItem.id]));
+    }
+  };
 
   return (
     <div id="artboard-main-container" className="flex-1 relative bg-gray-50 overflow-hidden flex flex-col artboard-capture-area">
       <DpiWarning count={lowDpiCount} />
-      <div className="flex-1 flex relative">
+      <div className="flex-1 flex overflow-hidden">
         <CanvasContainer
           zoom={zoom}
           showRulers={showRulers}
@@ -93,9 +122,16 @@ export default function Artboard({
           isDragging={isDragging}
           items={items}
           selectedId={selectedId}
+          selectedIds={selectedIds}
           showProperties={showProperties}
           addedToCart={addedToCart}
-          onWheel={onWheel}
+          onWheel={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              const delta = e.deltaY > 0 ? -0.1 : 0.1;
+              setZoom((z) => Math.min(3, Math.max(0.5, +(z + delta).toFixed(2))));
+            }
+          }}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDropEvent}
@@ -103,20 +139,34 @@ export default function Artboard({
           onZoomOut={() => setZoom((z) => Math.max(1, +(z - 0.1).toFixed(2)))}
           onCanvasClick={() => {
             setSelectedId(null);
+            setSelectedIds(new Set());
             setShowProperties({});
           }}
-          onItemSelect={(id) => {
-            setSelectedId(id);
+          onItemSelect={(id, multi) => {
+            if (multi) {
+              setSelectedIds(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              });
+              setSelectedId(id); // Update primary focus to latest clicked
+            } else {
+              setSelectedId(id);
+              setSelectedIds(new Set([id]));
+            }
             setShowProperties({});
           }}
           onToggleProperties={(id) =>
             setShowProperties((prev) => ({ ...prev, [id]: true }))
           }
           itemActions={itemActions}
+          onLink={handleLinkSelected}
           onDuplicate={duplicateSelected}
           onDelete={() => {
             itemActions.deleteSelected();
             setSelectedId(null);
+            setSelectedIds(new Set());
           }}
           onAddToCart={(it) => {
             if (onAddToCart && !addedToCart.has(it.id)) {
